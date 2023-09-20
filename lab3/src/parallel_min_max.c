@@ -73,6 +73,7 @@ int main(int argc, char **argv) {
     }
   }
 
+
   if (optind < argc) {
     printf("Has at least one no option argument\n");
     return 1;
@@ -86,8 +87,21 @@ int main(int argc, char **argv) {
 
   int *array = malloc(sizeof(int) * array_size);
   GenerateArray(array, array_size, seed);
+  for(int i = 0; i<array_size;i++){
+    printf("Arr[%d]: %d\n",i,array[i]);
+  }
   int active_child_processes = 0;
-
+  
+  int chunk_size = array_size /pnum;
+  int (*min_pipes)[2] = malloc(sizeof(int[2]) * pnum);
+  int (*max_pipes)[2] = malloc(sizeof(int[2]) * pnum);
+  
+  for(int i = 0; i < pnum; i++){
+    if(pipe(min_pipes[i]) == -1 || pipe(max_pipes[i]) == -1){
+      perror("pipe");
+      return 1;
+    }
+  }
   struct timeval start_time;
   gettimeofday(&start_time, NULL);
 
@@ -100,10 +114,22 @@ int main(int argc, char **argv) {
         // child process
 
         // parallel somehow
-
         if (with_files) {
           // use files here
         } else {
+          close(min_pipes[i][0]); //закрываем чтение для минимума
+          close(max_pipes[i][0]);// закрываем чтение для максимума
+          int start_index = i * chunk_size;
+          int end_index = (i == pnum - 1) ? array_size : (i+1) * chunk_size;
+          struct MinMax local_min_max = GetMinMax(array ,start_index, end_index);
+          printf("local_min: %d local_max: %d\n",local_min_max.min, local_min_max.max);
+          write(min_pipes[i][1], &local_min_max.min, sizeof(int));
+          write(max_pipes[i][1], &local_min_max.max, sizeof(int));
+
+          close(min_pipes[i][1]); // закрываем запись для минимума
+          close(max_pipes[i][1]); // закрываем запись для максимума
+          close(max_pipes[i][1]);
+            
           // use pipe here
         }
         return 0;
@@ -120,7 +146,7 @@ int main(int argc, char **argv) {
 
     active_child_processes -= 1;
   }
-
+  int min_result, max_result;
   struct MinMax min_max;
   min_max.min = INT_MAX;
   min_max.max = INT_MIN;
@@ -132,20 +158,27 @@ int main(int argc, char **argv) {
     if (with_files) {
       // read from files
     } else {
+      read(min_pipes[i][0], &min_result, sizeof(int));
+      read(max_pipes[i][0], &max_result, sizeof(int));
+      close(min_pipes[i][0]);//закрываем чтение для минимума
+      close(max_pipes[i][0]);//закрываем чтение для максимума
+      //free(min_pipes);
+      //free(max_pipes);
       // read from pipes
     }
+    printf("min_result: %d\n", min_result);
+    printf("max_result: %d\n", max_result);
 
-    if (min < min_max.min) min_max.min = min;
-    if (max > min_max.max) min_max.max = max;
+    if (min < min_max.min) min_max.min = min_result;
+    if (max > min_max.max) min_max.max = max_result;
   }
-
   struct timeval finish_time;
   gettimeofday(&finish_time, NULL);
 
   double elapsed_time = (finish_time.tv_sec - start_time.tv_sec) * 1000.0;
   elapsed_time += (finish_time.tv_usec - start_time.tv_usec) / 1000.0;
 
-  free(array);
+  //free(array);
 
   printf("Min: %d\n", min_max.min);
   printf("Max: %d\n", min_max.max);
