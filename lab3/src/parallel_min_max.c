@@ -122,7 +122,7 @@ int main(int argc, char **argv) {
           int start_index = i * chunk_size;
           int end_index = (i == pnum - 1) ? array_size : (i+1) * chunk_size;
           struct MinMax local_min_max = GetMinMax(array ,start_index, end_index);
-          printf("local_min: %d local_max: %d\n",local_min_max.min, local_min_max.max);
+          //printf("local_min: %d local_max: %d\n",local_min_max.min, local_min_max.max);
           write(min_pipes[i][1], &local_min_max.min, sizeof(int));
           write(max_pipes[i][1], &local_min_max.max, sizeof(int));
 
@@ -134,7 +134,10 @@ int main(int argc, char **argv) {
         }
         return 0;
       }
-
+      else{
+        close(min_pipes[i][1]); // закрываем запись для минимума
+        close(max_pipes[i][1]); // закрываем запись для максимума
+      }
     } else {
       printf("Fork failed!\n");
       return 1;
@@ -164,13 +167,12 @@ int main(int argc, char **argv) {
       close(max_pipes[i][0]);//закрываем чтение для максимума
       //free(min_pipes);
       //free(max_pipes);
-      // read from pipes
     }
-    printf("min_result: %d\n", min_result);
-    printf("max_result: %d\n", max_result);
+    //printf("min_result: %d\n", min_result);
+    //printf("max_result: %d\n", max_result);
 
-    if (min < min_max.min) min_max.min = min_result;
-    if (max > min_max.max) min_max.max = max_result;
+    if (min_result < min_max.min) min_max.min = min_result;
+    if (max_result > min_max.max) min_max.max = max_result;
   }
   struct timeval finish_time;
   gettimeofday(&finish_time, NULL);
@@ -178,7 +180,9 @@ int main(int argc, char **argv) {
   double elapsed_time = (finish_time.tv_sec - start_time.tv_sec) * 1000.0;
   elapsed_time += (finish_time.tv_usec - start_time.tv_usec) / 1000.0;
 
-  //free(array);
+  free(min_pipes);
+  free(max_pipes);
+  free(array);
 
   printf("Min: %d\n", min_max.min);
   printf("Max: %d\n", min_max.max);
