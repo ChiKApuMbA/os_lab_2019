@@ -87,21 +87,30 @@ int main(int argc, char **argv) {
 
   int *array = malloc(sizeof(int) * array_size);
   GenerateArray(array, array_size, seed);
-  for(int i = 0; i<array_size;i++){
+  /*for(int i = 0; i<array_size;i++){
     printf("Arr[%d]: %d\n",i,array[i]);
-  }
+  }*/
   int active_child_processes = 0;
   
   int chunk_size = array_size /pnum;
+  //с использование pipes
   int (*min_pipes)[2] = malloc(sizeof(int[2]) * pnum);
   int (*max_pipes)[2] = malloc(sizeof(int[2]) * pnum);
-  
   for(int i = 0; i < pnum; i++){
     if(pipe(min_pipes[i]) == -1 || pipe(max_pipes[i]) == -1){
       perror("pipe");
       return 1;
     }
   }
+
+  //с использованием файлов
+  FILE *min_file;
+  FILE *max_file;
+  min_file = fopen("min_values.txt", "w");
+  fclose(min_file);
+  max_file = fopen("max_values.txt", "w");
+  fclose(max_file);
+  
   struct timeval start_time;
   gettimeofday(&start_time, NULL);
 
@@ -112,9 +121,56 @@ int main(int argc, char **argv) {
       active_child_processes += 1;
       if (child_pid == 0) {
         // child process
-
+        
         // parallel somehow
         if (with_files) {
+
+          int start_index = i * chunk_size;
+          int end_index = (i == pnum - 1) ? array_size : (i+1) * chunk_size;
+          struct MinMax local_min_max = GetMinMax(array ,start_index, end_index);
+          
+          //для минимального значения
+          if(is_file_empty(min_file)){
+            min_file = fopen("min_values.txt","r+");
+            fprintf(min_file,"%d\n", local_min_max.min);
+            fclose(min_file);
+
+          }else{
+            min_file = fopen("min_values.txt", "r+");
+            int min_val_in_file;
+            fscanf(min_file, "%d", &min_val_in_file);
+            if(local_min_max.min < min_val_in_file){
+              fseek(min_file, 0 , SEEK_SET);
+              fprintf(min_file, "%d\n", local_min_max.min);
+            }
+            fclose(min_file);
+
+          }
+
+          //для максимального значения
+          if(is_file_empty(max_file)){
+            max_file = fopen("max_values.txt","r+");
+            fprintf(max_file,"%d\n", local_min_max.max);
+            fclose(max_file);
+
+          }else{
+            max_file = fopen("max_values.txt", "r+");
+            int max_val_in_file;
+            fscanf(max_file, "%d", &max_val_in_file);
+            if(local_min_max.max > max_val_in_file){
+              fseek(max_file, 0 , SEEK_SET);
+              fprintf(max_file, "%d\n", local_min_max.max);
+            }
+            fclose(max_file);
+
+          }
+                  
+          //fprintf(min_file, "%d\n", local_min_max.min);
+          //fprintf(max_file, "%d\n", local_min_max.max);
+      
+          //fclose(min_file);
+          //fclose(max_file);
+          
           // use files here
         } else {
           close(min_pipes[i][0]); //закрываем чтение для минимума
@@ -128,7 +184,6 @@ int main(int argc, char **argv) {
 
           close(min_pipes[i][1]); // закрываем запись для минимума
           close(max_pipes[i][1]); // закрываем запись для максимума
-          close(max_pipes[i][1]);
             
           // use pipe here
         }
@@ -146,9 +201,11 @@ int main(int argc, char **argv) {
 
   while (active_child_processes > 0) {
     // your code here
-
+    int status;
+    wait(&status);
     active_child_processes -= 1;
   }
+  
   int min_result, max_result;
   struct MinMax min_max;
   min_max.min = INT_MAX;
@@ -159,6 +216,12 @@ int main(int argc, char **argv) {
     int max = INT_MIN;
 
     if (with_files) {
+      min_file = fopen("min_values.txt", "r");
+      max_file = fopen("max_values.txt", "r");
+      fscanf(min_file, "%d", &min_result);
+      fscanf(max_file, "%d", &max_result);
+      fclose(min_file);
+      fclose(max_file);
       // read from files
     } else {
       read(min_pipes[i][0], &min_result, sizeof(int));

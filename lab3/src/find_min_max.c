@@ -23,7 +23,7 @@ struct MinMax GetMinMax(int *array, unsigned int begin, unsigned int end) {
       //printf("Cur_max:%d\n",min_max.max);
     }
   }
-  //printf("For %d -> %d\nCur_min:%d\nCur_max:%d\n", begin, end, min_max.min, min_max.max);
+  //printf("For %d -> %d:\nCur_min:%d\nCur_max:%d\n", begin, end, min_max.min, min_max.max);
   //fflush(stdout);
   return min_max;
 }
