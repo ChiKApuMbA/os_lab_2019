@@ -17,17 +17,20 @@
 #include "utils.h"
 
 pid_t *child_pids;
-
-void handle_alarm(int signo, int pnum){
+int pnum = -1;
+void handle_alarm(int signo){
   for(int i = 0;i < pnum; i++){
+    printf("The child process %d", child_pids[i]);
     kill(child_pids[i], SIGKILL);
   }
 }
 
 int main(int argc, char **argv) {
+  signal(SIGALRM, handle_alarm);
+  
   int seed = -1;
   int array_size = -1;
-  int pnum = -1;
+  //int pnum = -1;
   bool with_files = false;
   int timeout = -1;
 
@@ -38,12 +41,11 @@ int main(int argc, char **argv) {
                                       {"array_size", required_argument, 0, 0},
                                       {"pnum", required_argument, 0, 0},
                                       {"by_files", no_argument, 0, 'f'},
-                                      {"timeout", no_argument, 0, 0}
+                                      {"timeout", required_argument, 0, 0},
                                       {0, 0, 0, 0}};
 
     int option_index = 0;
     int c = getopt_long(argc, argv, "f", options, &option_index);
-
     if (c == -1) break;
 
     switch (c) {
@@ -60,7 +62,9 @@ int main(int argc, char **argv) {
             // error handling
             break;
           case 2:
+            printf("The pnum is: %d\n",pnum);
             pnum = atoi(optarg);
+            printf("The pnum is: %d\n",pnum);
             // your code here
             // error handling
             break;
@@ -68,7 +72,9 @@ int main(int argc, char **argv) {
             with_files = true;
             break;
           case 4:
+            printf("The timeout is: %d\n",timeout);
             timeout = atoi(optarg);
+            printf("The timeout is: %d\n",timeout);
             break;
 
           defalut:
@@ -78,7 +84,6 @@ int main(int argc, char **argv) {
       case 'f':
         with_files = true;
         break;
-      case
       case '?':
         break;
 
@@ -98,7 +103,6 @@ int main(int argc, char **argv) {
            argv[0]);
     return 1;
   }
-
   int *array = malloc(sizeof(int) * array_size);
   GenerateArray(array, array_size, seed);
   /*for(int i = 0; i<array_size;i++){
@@ -207,7 +211,7 @@ int main(int argc, char **argv) {
         return 0;
       }
       else{
-        child_pids[i] = pid;
+        child_pids[i] = child_pid;
         close(min_pipes[i][1]); // закрываем запись для минимума
         close(max_pipes[i][1]); // закрываем запись для максимума
       }
@@ -216,10 +220,10 @@ int main(int argc, char **argv) {
       return 1;
     }
   }
-  if(timeout != -1){
-    printf("Timeout set. Parent process will send SIGKILL after %d seconds\n", timeout);
+  if(timeout != -1 && getpid()!=0){
+    printf("Timeout set. Parent process with id %d will send SIGKILL after %d seconds\n", getpid() ,timeout);
     alarm(timeout);
-    for(int int i = 0; i < pnum; i++){
+    for(int i = 0; i < pnum; i++){
       int status;
       waitpid(child_pids[i], &status, WNOHANG );
     }
