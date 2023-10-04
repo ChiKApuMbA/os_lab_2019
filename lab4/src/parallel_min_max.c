@@ -20,7 +20,7 @@ pid_t *child_pids;
 int pnum = -1;
 void handle_alarm(int signo){
   for(int i = 0;i < pnum; i++){
-    printf("The child process %d", child_pids[i]);
+    printf("The child process is killed %d\n", child_pids[i]);
     kill(child_pids[i], SIGKILL);
   }
 }
@@ -105,12 +105,12 @@ int main(int argc, char **argv) {
   }
   int *array = malloc(sizeof(int) * array_size);
   GenerateArray(array, array_size, seed);
-  /*for(int i = 0; i<array_size;i++){
+  for(int i = 0; i<array_size;i++){
     printf("Arr[%d]: %d\n",i,array[i]);
-  }*/
+  }
   int active_child_processes = 0;
-  
   int chunk_size = array_size /pnum;
+  
   //с использование pipes
   int (*min_pipes)[2] = malloc(sizeof(int[2]) * pnum);
   int (*max_pipes)[2] = malloc(sizeof(int[2]) * pnum);
@@ -132,10 +132,9 @@ int main(int argc, char **argv) {
   child_pids = malloc(sizeof(pid_t) * pnum);
   
   struct timeval start_time;
+  pid_t parent_id = getpid();
+  printf("The parent id is %d\n",parent_id);
   gettimeofday(&start_time, NULL);
-
-  
-  
   for (int i = 0; i < pnum; i++) {
     pid_t child_pid = fork();
     if (child_pid >= 0) {
@@ -144,8 +143,9 @@ int main(int argc, char **argv) {
       if (child_pid == 0) {
         // child process
         // parallel somehow
+        printf("The child pid is %d \n", getpid());
         if (with_files) {
-
+          // use files here
           int start_index = i * chunk_size;
           int end_index = (i == pnum - 1) ? array_size : (i+1) * chunk_size;
           struct MinMax local_min_max = GetMinMax(array ,start_index, end_index);
@@ -165,16 +165,14 @@ int main(int argc, char **argv) {
               fprintf(min_file, "%d\n", local_min_max.min);
             }
             fclose(min_file);
-
           }
-
           //для максимального значения
           if(is_file_empty(max_file)){
             max_file = fopen("max_values.txt","r+");
             fprintf(max_file,"%d\n", local_min_max.max);
             fclose(max_file);
-
-          }else{
+          }
+          else{
             max_file = fopen("max_values.txt", "r+");
             int max_val_in_file;
             fscanf(max_file, "%d", &max_val_in_file);
@@ -183,17 +181,9 @@ int main(int argc, char **argv) {
               fprintf(max_file, "%d\n", local_min_max.max);
             }
             fclose(max_file);
-
           }
-                  
-          //fprintf(min_file, "%d\n", local_min_max.min);
-          //fprintf(max_file, "%d\n", local_min_max.max);
-      
-          //fclose(min_file);
-          //fclose(max_file);
-          
-          // use files here
-        } else {
+        }else{
+          // use pipe here
           close(min_pipes[i][0]); //закрываем чтение для минимума
           close(max_pipes[i][0]);// закрываем чтение для максимума
           int start_index = i * chunk_size;
@@ -206,78 +196,72 @@ int main(int argc, char **argv) {
           close(min_pipes[i][1]); // закрываем запись для минимума
           close(max_pipes[i][1]); // закрываем запись для максимума
             
-          // use pipe here
         }
+        //printf("Child pid %d is waiting for %d \n ",getpid(), getppid());
+        //waitpid(parent_id, NULL, 0);
+        //break;
         return 0;
       }
       else{
+        printf("I am parent %d and created child %d\n", getpid(), child_pid);
         child_pids[i] = child_pid;
         close(min_pipes[i][1]); // закрываем запись для минимума
         close(max_pipes[i][1]); // закрываем запись для максимума
       }
-    } else {
+    }else{
       printf("Fork failed!\n");
       return 1;
     }
   }
-  if(timeout != -1 && getpid()!=0){
+  /*if(getppid() == parent_id){
+    int status;
+    printf("The process with id: %d is waiting for process with id: %d\n", getpid(), parent_id);
+    waitpid(parent_id, &status, 0);
+  }*/
+  //printf("Process id: %d Parent id: %d \n",getpid(),getppid());
+  if(timeout != -1 && getpid() == parent_id){
     printf("Timeout set. Parent process with id %d will send SIGKILL after %d seconds\n", getpid() ,timeout);
     alarm(timeout);
-    for(int i = 0; i < pnum; i++){
-      int status;
-      waitpid(child_pids[i], &status, WNOHANG );
+    sleep(timeout);
+  }/*else{
+     for(int i = 0;i < pnum; i++){
+      printf("The child process with id: %d is gonna die :( (joke :) )\n", child_pids[i]);
+      kill(child_pids[i], SIGKILL);
     }
-    
-  }else{
-     while (active_child_processes > 0) {
-    // your code here
-    int status;
-    wait(&status);
-    active_child_processes -= 1;
-  }
-  }
-  
+  }*/
   int min_result, max_result;
   struct MinMax min_max;
   min_max.min = INT_MAX;
   min_max.max = INT_MIN;
-
-  for (int i = 0; i < pnum; i++) {
-    int min = INT_MAX;
-    int max = INT_MIN;
-
-    if (with_files) {
-      min_file = fopen("min_values.txt", "r");
-      max_file = fopen("max_values.txt", "r");
-      fscanf(min_file, "%d", &min_result);
-      fscanf(max_file, "%d", &max_result);
-      fclose(min_file);
-      fclose(max_file);
-      // read from files
-    } else {
+  if (with_files){
+    // read from files
+    min_file = fopen("min_values.txt", "r");
+    max_file = fopen("max_values.txt", "r");
+    fscanf(min_file, "%d", &min_result);
+    fscanf(max_file, "%d", &max_result);
+    fclose(min_file);
+    fclose(max_file);
+  }else{
+    for (int i = 0; i < pnum; i++){
+      int min = INT_MAX;
+      int max = INT_MIN;
       read(min_pipes[i][0], &min_result, sizeof(int));
       read(max_pipes[i][0], &max_result, sizeof(int));
       close(min_pipes[i][0]);//закрываем чтение для минимума
       close(max_pipes[i][0]);//закрываем чтение для максимума
-      //free(min_pipes);
-      //free(max_pipes);
+      if (min_result < min_max.min) min_max.min = min_result;
+      if (max_result > min_max.max) min_max.max = max_result;
     }
-    //printf("min_result: %d\n", min_result);
-    //printf("max_result: %d\n", max_result);
-
-    if (min_result < min_max.min) min_max.min = min_result;
-    if (max_result > min_max.max) min_max.max = max_result;
   }
   struct timeval finish_time;
   gettimeofday(&finish_time, NULL);
-
   double elapsed_time = (finish_time.tv_sec - start_time.tv_sec) * 1000.0;
   elapsed_time += (finish_time.tv_usec - start_time.tv_usec) / 1000.0;
-
   free(min_pipes);
   free(max_pipes);
+  remove("min_values.txt");
+  remove("max_values.txt");
   free(array);
-
   printf("Min: %d\n", min_max.min);
   printf("Max: %d\n", min_max.max);
   printf("Elapsed time: %fms\n", elapsed_time);
