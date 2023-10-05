@@ -261,6 +261,7 @@ int main(int argc, char **argv) {
   free(max_pipes);
   remove("min_values.txt");
   remove("max_values.txt");
+  
   free(array);
   printf("Min: %d\n", min_max.min);
   printf("Max: %d\n", min_max.max);
