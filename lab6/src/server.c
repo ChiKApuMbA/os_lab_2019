@@ -12,6 +12,7 @@
 #include <sys/types.h>
 
 #include "pthread.h"
+//uint64_t result = 1;
 
 struct FactorialArgs {
   uint64_t begin;
@@ -34,9 +35,11 @@ uint64_t MultModulo(uint64_t a, uint64_t b, uint64_t mod) {
 
 uint64_t Factorial(const struct FactorialArgs *args) {
   uint64_t ans = 1;
-
+  printf("The begin is %ld\n The end is %ld\n", args->begin, args->end);
+  for(uint64_t i = args->begin; i <= args->end; i++){
+    ans = MultModulo(ans, i , args->mod);
+  }
   // TODO: your code here
-
   return ans;
 }
 
@@ -154,13 +157,13 @@ int main(int argc, char **argv) {
       memcpy(&end, from_client + sizeof(uint64_t), sizeof(uint64_t));
       memcpy(&mod, from_client + 2 * sizeof(uint64_t), sizeof(uint64_t));
 
-      fprintf(stdout, "Receive: %llu %llu %llu\n", begin, end, mod);
+      fprintf(stdout, "Receive: %lu %lu %lu\n", begin, end, mod);
 
       struct FactorialArgs args[tnum];
       for (uint32_t i = 0; i < tnum; i++) {
         // TODO: parallel somehow
-        args[i].begin = 1;
-        args[i].end = 1;
+        args[i].begin = begin;
+        args[i].end = end;
         args[i].mod = mod;
 
         if (pthread_create(&threads[i], NULL, ThreadFactorial,
@@ -172,12 +175,13 @@ int main(int argc, char **argv) {
 
       uint64_t total = 1;
       for (uint32_t i = 0; i < tnum; i++) {
-        uint64_t result = 0;
-        pthread_join(threads[i], (void **)&result);
+        uint64_t result;
+        pthread_join(threads[i], (void *)&result);
+        printf("The result is %ld\n", result);
         total = MultModulo(total, result, mod);
       }
 
-      printf("Total: %llu\n", total);
+      printf("Total: %lu\n", total);
 
       char buffer[sizeof(total)];
       memcpy(buffer, &total, sizeof(total));
