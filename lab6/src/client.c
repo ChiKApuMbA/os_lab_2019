@@ -126,6 +126,8 @@ int main(int argc, char **argv) {
   memcpy(to[0].ip, "127.0.0.1", sizeof("127.0.0.1"));
 
   // TODO: work continiously, rewrite to make parallel
+  uint64_t result = 1;
+  
   for (int i = 0; i < servers_num; i++) {
     struct hostent *hostname = gethostbyname(to[i].ip);
     if (hostname == NULL) {
@@ -148,11 +150,6 @@ int main(int argc, char **argv) {
       fprintf(stderr, "Connection failed\n");
       exit(1);
     }
-
-    // TODO: for one server
-    // parallel between servers
-    //int start = (k / servers_num) * i + 1;
-    ///int end = (servers_num == servers_num - 1) ? k : (k / servers_num) * (i + 1);
     uint64_t begin = (k / servers_num) * i + 1;
     uint64_t end = (servers_num == servers_num - 1) ? k : (k / servers_num) * (i + 1);
     printf("For %d server:\nbegin is %ld\n end is %ld\n",i,begin, end);
@@ -176,10 +173,11 @@ int main(int argc, char **argv) {
     // unite results
     uint64_t answer = 0;
     memcpy(&answer, response, sizeof(uint64_t));
+    result *= answer;
     printf("answer: %llu\n", answer);
     close(sck);
   }
   free(to);
-
+  printf("The result is: %ld \n", result % mod);
   return 0;
 }

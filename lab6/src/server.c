@@ -29,13 +29,12 @@ uint64_t MultModulo(uint64_t a, uint64_t b, uint64_t mod) {
     a = (a * 2) % mod;
     b /= 2;
   }
-
   return result % mod;
 }
 
 uint64_t Factorial(const struct FactorialArgs *args) {
   uint64_t ans = 1;
-  printf("The begin is %ld\n The end is %ld\n", args->begin, args->end);
+  //printf("The begin is %ld\n The end is %ld\n", args->begin, args->end);
   for(uint64_t i = args->begin; i <= args->end; i++){
     ans = MultModulo(ans, i , args->mod);
   }
@@ -158,13 +157,17 @@ int main(int argc, char **argv) {
       memcpy(&mod, from_client + 2 * sizeof(uint64_t), sizeof(uint64_t));
 
       fprintf(stdout, "Receive: %lu %lu %lu\n", begin, end, mod);
-
+      
+      uint64_t range = end - begin + 1;
+      uint64_t step = range / tnum;
+      
       struct FactorialArgs args[tnum];
       for (uint32_t i = 0; i < tnum; i++) {
         // TODO: parallel somehow
-        args[i].begin = begin;
-        args[i].end = end;
+        args[i].begin = begin + i * step;
+        args[i].end = (i == tnum - 1) ? end : begin + (i + 1) * step - 1;
         args[i].mod = mod;
+        printf("For thread with num %d:\nbegin: %ld \n end: %ld\n", i, args[i].begin, args[i].end);
 
         if (pthread_create(&threads[i], NULL, ThreadFactorial,
                            (void *)&args[i])) {
